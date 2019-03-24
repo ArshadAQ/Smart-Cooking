@@ -136,9 +136,14 @@ class Burner{
     FirebaseObject modesIntervalsNode = NULL;
     String modesOrder[MAX_MODES];
     float modesFinishTimes[MAX_MODES];
+
+    bool modesFinished[MAX_MODES] = {false};
+
     int num_modes;
 
-    String knob_status;
+    String knob_status = "OFF";
+
+    boolean flame_detect = false;
 
     // knob mode
     // prev mode and the mode to switch to next
@@ -148,10 +153,11 @@ class Burner{
 
         // the path to the the burner object in firebase
         String firebase_path;
-        
+
+        // records the time when burner is ignited        
         int startMillis;
         StepperMotor motor;
-        boolean ignited;
+        boolean ignited = false;
     
         void setModesIntervalsNode(FirebaseObject modesIntervalsNode){
             this -> modesIntervalsNode = modesIntervalsNode;
@@ -171,7 +177,22 @@ class Burner{
             knob_status = pos;
             Serial.print("knob status path is");
             Serial.println(firebase_path + String("knob_status"));
+            Serial.print("knob status is: ");
+            Serial.println(pos);
+            
             Firebase.setString(firebase_path + String("knob_status"), pos);
+            // sometimes fails, so try againa after 1 second
+            if(Firebase.failed()){
+                delay(1000);
+                Firebase.setString(firebase_path + String("knob_status"), pos);
+            }
+        }
+
+        void setFlameStatus(boolean state){
+            flame_detect = state;
+            Serial.print("Flame status is ");
+            Serial.println(firebase_path + String("flame_detect"));
+            Firebase.setBool(firebase_path + String("flame_detect"), state);
         }
 };
 
@@ -214,19 +235,31 @@ void Burner :: initCooking(){
 }
 void Burner :: autoKnobControl(){
 
-    Serial.println("autoKnobControl called!");
+//    Serial.println("autoKnobControl called!");
     unsigned long diff = millis() - startMillis;
     for(int i = num_modes - 1; i >= 0; i--){
 //        Serial.println(modesOrder[i]);
 //        Serial.println(modesFinishTimes[i]);
-        if(diff >= modesFinishTimes[i]*60000){
+//        Serial.print(modesFinished[i]);
+//        Serial.println(i);
+        if((diff >= modesFinishTimes[i]*60000) && (modesFinished[i] == false)){
             Serial.print(prev);
             Serial.println("is over");
             next = (i == num_modes - 1 ? "OFF": modesOrder[i+1]);
             Serial.print("Next mode is: ");
             Serial.println(next);
             motor.setDirAndRotate(prev, next);
+            setKnobStatus(next);
+            if(next.equalsIgnoreCase("OFF")){
+                ignited = false;
+                setFlameStatus(false);
+            }
             prev = next;
+            modesFinished[i] = true;
+            Serial.print("Mode");
+            Serial.print(i);
+            Serial.println(" finished");
+            Serial.println(modesFinished[i]);
             break;
         }
     }
@@ -238,11 +271,14 @@ boolean Burner :: turnONandWaitForIgnition(String frstMode){
     
     prev = "OFF";
     next = frstMode;
+    
     motor.setDirAndRotate(prev, next);
     setKnobStatus(next);
+    prev = next;
 
     // TODO: detect flame
     boolean flame_detect = true;
+    setFlameStatus(flame_detect);
     // check for flame 5 times within 10 seconds
     for(int i = 2000; i <= 10000; i+=2000){
         delay(i);
@@ -375,10 +411,10 @@ void setup() {
 
     
     num_burners = Firebase.getInt("/aaa/config/num_burners");
-    for(int i = 0; i < num_burners; i++){
-        burners[i].ignited = false;
-        burners[i].setModesIntervalsNode(NULL);
-    }
+//    for(int i = 0; i < num_burners; i++){
+//        burners[i].ignited = false;
+//        burners[i].setModesIntervalsNode(NULL);
+//    }
 
     
     Firebase.stream("/aaa");
@@ -396,7 +432,8 @@ void loop() {
 
     // monitor manual knob and auto knob control for each burner
     for(int i = 0; i < num_burners; i++){
-        Burner curr_burner = burners[i];
+        // reference is very very important!!
+        Burner &curr_burner = burners[i];
         if(curr_burner.ignited){
 //            curr_burner.monitorManualKnob();
 //            Serial.print("calling auto knob control on burner");
@@ -405,9 +442,6 @@ void loop() {
         }
     }
 
-//    if(cooking){
-//        monitorManualKnob();
-//    }
 
     if (Firebase.available()) {
         FirebaseObject event = Firebase.readEvent();
