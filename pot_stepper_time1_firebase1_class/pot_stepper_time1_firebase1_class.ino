@@ -33,10 +33,11 @@ String modes[] = {"OFF", "ON-OFF", "ON", "ON-SIM", "SIM"};
 
 float getFlameFactor(String prev, String next){
 //    float factor;
-    if(prev.equalsIgnoreCase("ON") && next.equalsIgnoreCase("SIM")){
-        return 2;
+    Serial.println("getting factor..");
+    if(prev.substring(0,2).equalsIgnoreCase("ON") && next.substring(0,6).equalsIgnoreCase("ON-OFF")){
+        return 1.5;
     }
-
+    return 0;
 //    return factor;
 }
 
@@ -169,6 +170,8 @@ class Burner{
 
     int num_modes;
 
+    int count = 0;
+
     String knob_status = "OFF";
 
     boolean flame_detect = false;
@@ -178,6 +181,8 @@ class Burner{
     String prev, next;
 
     public:
+
+        String food_name;
 
         // the path to the the burner object in firebase
         String firebase_path;
@@ -231,6 +236,7 @@ class Burner{
             Firebase.setBool(firebase_path + String("flame_detect"), state);
         }
 
+        // function that updates knob modes duration in the database as and when the user overrides the duration
         void updateFirebaseModesNode(){
             Serial.println("In update firebase modes");
             // create JSON object and push to firebase
@@ -243,6 +249,7 @@ class Burner{
                 newModesNode[modesOrder[i]] = modesIntervalsArr[i];
                 Serial.print(modesOrder[i]);
                 Serial.println(modesIntervalsArr[i]);
+                Serial.println(modesFinishTimes[i]);
             }
 
             Serial.println("Updated modes node: ");
@@ -252,6 +259,12 @@ class Burner{
                 float val = kvp.value;
                 Serial.println(key);
                 Serial.println(val);
+            }
+            Serial.println(String("/aaa/Food_profile/") + food_name + String("/steps"));
+//            modesIntervalsNode = (FirebaseObject&)newModesNode;
+            Firebase.set(String("/aaa/Food_profile/") + food_name + String("/steps"), newModesNode);
+            if(Firebase.failed()){
+                Serial.println("Failed to update modes");
             }
         }
 };
@@ -360,6 +373,9 @@ void Burner :: monitorManualKnob(){
         
         next = modes[index];
 //        burners[burnerNumber].motor.setDirAndRotate(prev, next);
+        if(prev.equalsIgnoreCase(next)){
+            return;
+        }
         motor.setDirAndRotate(prev, next);
         
 //        unsigned long diff1 = millis() - burners[burnerNumber].startMillis;
@@ -393,6 +409,7 @@ void Burner :: monitorManualKnob(){
                 }
                 // if the system is in its last step, and the user abrupts this last step and goes on to a new step
                 else if(i == num_modes -1 && !next.equalsIgnoreCase("OFF")){
+                    Serial.println("NEW step in the last..");
                     float k;
                     num_modes++;
                     modesOrder[i+1] = next;
@@ -403,18 +420,71 @@ void Burner :: monitorManualKnob(){
                 // if the system is not in the last step and the user abrupts the step and manually goes to a new step
                 // then the new step and its finish time should be added to the arrays
                 else if(i < num_modes - 1 && !next.equalsIgnoreCase(modesOrder[i+1])){
+                    Serial.println("NEW step in between..");
                     float k;
-                    // shift the arrays to insert the new mode and finish time in between
-                    for(int j = num_modes; j > i+1; j--){
-                        modesOrder[j] = modesOrder[j-1];
-                        modesFinishTimes[j] = modesFinishTimes[j-1];
-                        modesIntervalsArr[j] = modesIntervalsArr[j-1];
+                    // check if the next mode is already present in subsequent modes
+                    bool presentInSubsequent = false;
+                    int index = 0;
+                    for(int j = i+2; j < num_modes; j++){
+                        if(next.equalsIgnoreCase(modesOrder[j])){
+                            presentInSubsequent = true;
+                            index = j;
+                        }
                     }
-                    num_modes++;
-                    modesOrder[i+1] = next;
-                    modesFinishTimes[i+1] = modesFinishTimes[i] + durReduced * getFlameFactor(prev, next);
-                    modesIntervalsArr[i+1] = durReduced * getFlameFactor(prev, next);
-                    updateFirebaseModesNode();
+                    // if it is already present in subsequent modes, then delete all modes in between
+                    if(presentInSubsequent){
+                        Serial.println("Present in subsequent..at index");
+                        Serial.println(index);
+                        int gap = index-(i+1);
+                        for(int j = index; j < num_modes; j++){
+                            modesOrder[j-gap] = modesOrder[j];
+                            modesFinishTimes[j-gap] = modesFinishTimes[j];
+                            modesIntervalsArr[j-gap] = modesIntervalsArr[j];
+                        }
+
+                        // update finish times
+                        for(int j = i+1; j <= index; j++){
+                            modesFinishTimes[j] = modesFinishTimes[j-1] + modesIntervalsArr[j];
+                        }
+                        num_modes -= gap;
+                        Serial.println("number of modes");
+                        Serial.println(num_modes);
+                        updateFirebaseModesNode();
+                    } else {
+
+                        // shift the arrays to insert the new mode and finish time in between
+                        for(int j = num_modes; j > i+1; j--){
+                            modesOrder[j] = modesOrder[j-1];
+                            modesFinishTimes[j] = modesFinishTimes[j-1];
+                            modesIntervalsArr[j] = modesIntervalsArr[j-1];
+                        }
+                        num_modes++;
+
+                        // check if the next mode was already encountered in previous modes
+                        bool presentInPrev = false;
+                        int index = 0;
+                        for(int j = 0; j < i; j++){
+                            if(next.equalsIgnoreCase(modesOrder[j])){
+                                presentInPrev = true;
+                                index = j;
+                            }
+                        }
+
+                        // if present in previous modes, then add a counter to the mode name
+                        if(presentInPrev){
+                            modesOrder[i+1] = next + String(count++);
+                        } else{
+                            modesOrder[i+1] = next;
+                        }
+                        modesFinishTimes[i+1] = modesFinishTimes[i] + (durReduced * getFlameFactor(prev, next));
+                        modesIntervalsArr[i+1] = durReduced * getFlameFactor(prev, next);
+
+                        // change finish times after inserting mode in between
+                        for(int j = i+2; j < num_modes; j++){
+                            modesFinishTimes[j] = modesFinishTimes[j-1] + modesIntervalsArr[j];
+                        }
+                        updateFirebaseModesNode();
+                    }
                     
                 }
                 break;
@@ -548,6 +618,11 @@ void loop() {
 //                String knob_status = Firebase.getString("/aaa/" + burner + "knob_status");
                 Serial.println(path);
                 String knob_status = Firebase.getString(path + "/knob_status");
+                if(Firebase.failed()){
+                    Serial.println("get knob status failed.. trying again");
+                    delay(1000);
+                    knob_status = Firebase.getString(path + "/knob_status");
+                }
                 Serial.println(data);
                 Serial.println(knob_status);
                 if(knob_status.equalsIgnoreCase("OFF") && data == 1){
@@ -562,6 +637,7 @@ void loop() {
                     Serial.println(burner.substring(6));
                     int burnerNumber = (burner.substring(6).toInt()) - 1;
                     burners[burnerNumber].firebase_path = path;
+                    burners[burnerNumber].food_name = food_name;
                     Serial.print("Burner number is: ");
                     Serial.println(burnerNumber);
                     FirebaseObject modesIntervalsNode = Firebase.get(String("/aaa/") + String("Food_profile/") + food_name + String("/steps"));
