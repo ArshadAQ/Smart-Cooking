@@ -411,10 +411,11 @@ void setup() {
 
     
     num_burners = Firebase.getInt("/aaa/config/num_burners");
-//    for(int i = 0; i < num_burners; i++){
+    for(int i = 0; i < num_burners; i++){
 //        burners[i].ignited = false;
 //        burners[i].setModesIntervalsNode(NULL);
-//    }
+        burners[i].motor.initPins(D8, D7);
+    }
 
     
     Firebase.stream("/aaa");
@@ -465,6 +466,8 @@ void loop() {
 //                String knob_status = Firebase.getString("/aaa/" + burner + "knob_status");
                 Serial.println(path);
                 String knob_status = Firebase.getString(path + "/knob_status");
+                Serial.println(data);
+                Serial.println(knob_status);
                 if(knob_status.equalsIgnoreCase("OFF") && data == 1){
                     // the request is to switch on the burner
                     Serial.println("Need to start!");
