@@ -6,16 +6,18 @@
 #define FIREBASE_AUTH "981Hw0F0SbDQnf3nr4AZnyzKPgYUeEjEiRTQk6cC"
 #define WIFI_SSID "TP-Link_D322"
 #define WIFI_PASSWORD "aqaiyoom123"
+//#define WIFI_SSID "Moto G (5S) Plus 6296"
+//#define WIFI_PASSWORD "ars123had"
 
 #define MAX_MODES 6
 #define MAX_BURNERS 6
 
 int potPin = A0;    // select the input pin for the potentiometer
 
-int val = 0;       // variable to store the value coming from the sensor
-
-int deg = 0;       // variable to store the value coming from the sensor
-int prevDeg = 0;
+//int val = 0;       // variable to store the value coming from the sensor
+//
+//int deg = 0;       // variable to store the value coming from the sensor
+//int prevDeg = 0;
 
 int pos = 0;
 
@@ -28,6 +30,15 @@ const int dirPin = D7;
 
 int positions[] = {0, 45, 90, 135, 180};
 String modes[] = {"OFF", "ON-OFF", "ON", "ON-SIM", "SIM"};
+
+float getFlameFactor(String prev, String next){
+//    float factor;
+    if(prev.equalsIgnoreCase("ON") && next.equalsIgnoreCase("SIM")){
+        return 2;
+    }
+
+//    return factor;
+}
 
 // stores object of duration for each mode for all burners
 //FirebaseObject modesIntervalsNode[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
@@ -43,23 +54,6 @@ int num_burners;
 
 int onEndTime = 15000;
 int simEndTime = 17000;
-
-
-int getDegree() {
-    
-    val = analogRead(potPin);    // read the value from the sensor
-
-    // deg = map(val, 150, 820, 180, 0);
-    deg = map(val, 136, 840, 180, 0);
-    
-    if (deg < 0) {
-        deg = 0;
-    } else if (deg > 180) {
-        deg = 180;
-    }
-    
-    return deg;
-}
 
 class StepperMotor{
 
@@ -128,6 +122,39 @@ void StepperMotor :: rotate(int deg, int dir) {
 }
 //boolean cooking = false;
 
+class Potentiometer{
+    
+    int potPin;
+    
+    public:
+
+        int prevDeg = 0;
+        
+        void initPin(int potPin);
+        int getDegree();
+};
+
+void Potentiometer :: initPin(int potPin){
+    this -> potPin = potPin;
+}
+
+int Potentiometer :: getDegree() {
+    
+    int val = analogRead(potPin);    // read the value from the sensor
+
+    // deg = map(val, 150, 820, 180, 0);
+    int deg = map(val, 136, 840, 180, 0);
+    
+    if (deg < 0) {
+        deg = 0;
+    } else if (deg > 180) {
+        deg = 180;
+    }
+    
+    return deg;
+}
+
+
 
 class Burner{
     
@@ -136,6 +163,7 @@ class Burner{
     FirebaseObject modesIntervalsNode = NULL;
     String modesOrder[MAX_MODES];
     float modesFinishTimes[MAX_MODES];
+    float modesIntervalsArr[MAX_MODES];
 
     bool modesFinished[MAX_MODES] = {false};
 
@@ -156,7 +184,13 @@ class Burner{
 
         // records the time when burner is ignited        
         int startMillis;
+
+        // motor control
         StepperMotor motor;
+
+        // monitor potentiometer
+        Potentiometer pot;
+        
         boolean ignited = false;
     
         void setModesIntervalsNode(FirebaseObject modesIntervalsNode){
@@ -170,6 +204,8 @@ class Burner{
         }
         void initCooking();
         void autoKnobControl();
+
+        void monitorManualKnob();
 
         boolean turnONandWaitForIgnition(String frstMode);
 
@@ -193,6 +229,30 @@ class Burner{
             Serial.print("Flame status is ");
             Serial.println(firebase_path + String("flame_detect"));
             Firebase.setBool(firebase_path + String("flame_detect"), state);
+        }
+
+        void updateFirebaseModesNode(){
+            Serial.println("In update firebase modes");
+            // create JSON object and push to firebase
+            StaticJsonBuffer<200> jsonBuffer;
+
+            // create an object
+            Serial.println("Updating..");
+            JsonObject& newModesNode = jsonBuffer.createObject();
+            for(int i = 0; i < num_modes; i++){
+                newModesNode[modesOrder[i]] = modesIntervalsArr[i];
+                Serial.print(modesOrder[i]);
+                Serial.println(modesIntervalsArr[i]);
+            }
+
+            Serial.println("Updated modes node: ");
+            for(JsonPair& kvp : newModesNode) {
+                // But the key is actually stored in RAM (in the JsonBuffer)
+                String key = kvp.key;
+                float val = kvp.value;
+                Serial.println(key);
+                Serial.println(val);
+            }
         }
 };
 
@@ -224,11 +284,14 @@ void Burner :: initCooking(){
         modesOrder[i] = key;
         val = kvp.value;
         sum += val;
+        modesIntervalsArr[i] = val;
         modesFinishTimes[i++] = sum;
 //        Serial.println(key);
+//        Serial.println(val);
 //        Serial.println(sum);
-//        Serial.println(modesOrder[i-1]);
-//        Serial.println(modesFinishTimes[i-1]);
+        Serial.println(modesOrder[i-1]);
+        Serial.println(modesFinishTimes[i-1]);
+        Serial.println(modesIntervalsArr[i-1]);
     }
     
     
@@ -245,6 +308,7 @@ void Burner :: autoKnobControl(){
         if((diff >= modesFinishTimes[i]*60000) && (modesFinished[i] == false)){
             Serial.print(prev);
             Serial.println("is over");
+            Serial.println(modesFinishTimes[i]);
             next = (i == num_modes - 1 ? "OFF": modesOrder[i+1]);
             Serial.print("Next mode is: ");
             Serial.println(next);
@@ -253,6 +317,7 @@ void Burner :: autoKnobControl(){
             if(next.equalsIgnoreCase("OFF")){
                 ignited = false;
                 setFlameStatus(false);
+                Firebase.setInt(firebase_path + String("req_to_start_stop"), 0);
             }
             prev = next;
             modesFinished[i] = true;
@@ -262,6 +327,101 @@ void Burner :: autoKnobControl(){
             Serial.println(modesFinished[i]);
             break;
         }
+    }
+}
+
+void Burner :: monitorManualKnob(){
+
+    // monitor manual knob(potentiometer) control
+    int deg = pot.getDegree();
+    
+    if (abs(pot.prevDeg - deg) > 40) {
+        // wait for 2 seconds and read again for a stable value
+        delay(2000);
+    
+        deg = pot.getDegree();
+        pot.prevDeg = deg;
+        
+        int minDiff = 180;
+        int diff;
+        int index = 4;
+        for (int i = 0; i < 5; i++) {
+            diff = abs(deg - positions[i]);
+            if (diff < minDiff) {
+                minDiff = diff;
+                pos = positions[i];
+                index = i;
+            }
+        }
+    
+    
+        Serial.print("At degree: ");
+        Serial.println(deg);
+        
+        next = modes[index];
+//        burners[burnerNumber].motor.setDirAndRotate(prev, next);
+        motor.setDirAndRotate(prev, next);
+        
+//        unsigned long diff1 = millis() - burners[burnerNumber].startMillis;
+        unsigned long diff1 = millis() - startMillis;
+
+        for(int i = 0; i < num_modes; i++){
+            if((diff1 <= modesFinishTimes[i]*60000)){
+                float prevEndTime = modesFinishTimes[i];
+
+                // this mode has stopped early and the time is diff1
+                modesFinishTimes[i] = (float)diff1/60000;
+
+                Serial.print("Updated finish time for ");
+                Serial.println(modesOrder[i]);
+                Serial.println(modesFinishTimes[i]);
+
+                float durReduced = prevEndTime - modesFinishTimes[i];
+
+                Serial.print("Duration reduced: ");
+                Serial.println(durReduced);
+
+                modesIntervalsArr[i] -= durReduced;
+
+                // if the manual knob position is the same as the next upcoming step in the automatic system mode order
+                // then reduce all subsequent mode finish times by 'durReduced'
+                if(i < num_modes - 1 && next.equalsIgnoreCase(modesOrder[i+1])){
+                    for(int j = i+1; j < num_modes; j++){
+                        modesFinishTimes[j] -= durReduced;
+                    }
+                    updateFirebaseModesNode();
+                }
+                // if the system is in its last step, and the user abrupts this last step and goes on to a new step
+                else if(i == num_modes -1 && !next.equalsIgnoreCase("OFF")){
+                    float k;
+                    num_modes++;
+                    modesOrder[i+1] = next;
+                    modesFinishTimes[i+1] = modesFinishTimes[i] + durReduced * getFlameFactor(prev, next);
+                    modesIntervalsArr[i+1] = durReduced * getFlameFactor(prev, next);
+                    updateFirebaseModesNode();
+                }
+                // if the system is not in the last step and the user abrupts the step and manually goes to a new step
+                // then the new step and its finish time should be added to the arrays
+                else if(i < num_modes - 1 && !next.equalsIgnoreCase(modesOrder[i+1])){
+                    float k;
+                    // shift the arrays to insert the new mode and finish time in between
+                    for(int j = num_modes; j > i+1; j--){
+                        modesOrder[j] = modesOrder[j-1];
+                        modesFinishTimes[j] = modesFinishTimes[j-1];
+                        modesIntervalsArr[j] = modesIntervalsArr[j-1];
+                    }
+                    num_modes++;
+                    modesOrder[i+1] = next;
+                    modesFinishTimes[i+1] = modesFinishTimes[i] + durReduced * getFlameFactor(prev, next);
+                    modesIntervalsArr[i+1] = durReduced * getFlameFactor(prev, next);
+                    updateFirebaseModesNode();
+                    
+                }
+                break;
+            }
+        }
+        
+        prev = next;
     }
 }
 
@@ -296,85 +456,6 @@ boolean Burner :: turnONandWaitForIgnition(String frstMode){
 
 Burner burners[MAX_BURNERS];
 
-void monitorManualKnob(int burnerNumber){
-
-    // monitor manual knob(potentiometer) control
-    deg = getDegree();
-
-    String prev, next;
-    
-    if (abs(prevDeg - deg) > 40) {
-        // wait for 2 seconds and read again for a stable value
-        delay(2000);
-    
-        deg = getDegree();
-        prevDeg = deg;
-        
-        int minDiff = 180;
-        int diff;
-        int index = 4;
-        for (int i = 0; i < 5; i++) {
-            diff = abs(deg - positions[i]);
-            if (diff < minDiff) {
-                minDiff = diff;
-                pos = positions[i];
-                index = i;
-            }
-        }
-    
-    
-        Serial.print("At degree: ");
-        Serial.println(deg);
-        
-        next = modes[index];
-        burners[burnerNumber].motor.setDirAndRotate(prev, next);
-        
-        unsigned long diff1 = millis() - burners[burnerNumber].startMillis;
-        if (diff1 <= onEndTime) {
-        
-            int prevOnEndTime = onEndTime;
-            onEndTime = diff1;
-            
-            int redByAmt = prevOnEndTime - onEndTime;
-            
-            if (next == "SIM") {
-            
-                // reduce finish time of all subsequent steps, as the previous step has stopped early
-                simEndTime -= redByAmt;
-                Serial.println(redByAmt);
-            }
-            // else if it is a new step
-            else {
-                int factor = 2;
-                // change finish time of all subsequent steps, as the previous step has stopped early
-                Serial.println(redByAmt/1000);
-                simEndTime = simEndTime - redByAmt + (redByAmt * factor);
-                Serial.println(simEndTime/1000);
-                prev = "ON-OFF";
-            }
-
-        
-        } else if (diff1 <= simEndTime) {
-            int prevSimEndTime = simEndTime;
-            simEndTime = diff1;
-            
-            int redByAmt = prevSimEndTime - simEndTime;
-            
-            if (next == "OFF") {
-                //                simEndTime -= redByAmt
-                ;
-            } else {
-                int factor = 3;
-                // change finish time of all subsequent steps, as the previous step has stopped early
-                //                simEndTime = simEndTime - redByAmt + redByAmt*factor;
-            }
-        
-        
-        }
-        
-        prev = next;
-    }
-}
 
 void setup() {
     
@@ -415,6 +496,7 @@ void setup() {
 //        burners[i].ignited = false;
 //        burners[i].setModesIntervalsNode(NULL);
         burners[i].motor.initPins(D8, D7);
+        burners[i].pot.initPin(A0);
     }
 
     
@@ -436,7 +518,7 @@ void loop() {
         // reference is very very important!!
         Burner &curr_burner = burners[i];
         if(curr_burner.ignited){
-//            curr_burner.monitorManualKnob();
+            curr_burner.monitorManualKnob();
 //            Serial.print("calling auto knob control on burner");
 //            Serial.println(i);
             curr_burner.autoKnobControl();
