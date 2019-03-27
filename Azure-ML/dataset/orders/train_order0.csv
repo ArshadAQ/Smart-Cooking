@@ -1,0 +1,6 @@
+Food_item,Mass,Burner_size,order0
+Tea,600,medium,1
+Milk,1000,medium,-1
+Idli,500,medium,1
+Water,200,medium,0
+Chicken soup,500,medium,0
