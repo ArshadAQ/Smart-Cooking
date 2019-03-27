@@ -41,9 +41,11 @@ float getFlameFactor(String prev, String next){
     } else if(prev.substring(0,6).equalsIgnoreCase("ON-SIM") && next.substring(0,2).equalsIgnoreCase("ON")){
         return 2.0/3;
     } else if(prev.substring(0,3).equalsIgnoreCase("SIM") && next.substring(0,6).equalsIgnoreCase("ON-SIM")){
-        return 1.5;
+        return 2.0/3;
     } else if(prev.substring(0,3).equalsIgnoreCase("SIM") && next.substring(0,2).equalsIgnoreCase("ON")){
         return 0.5;
+    } else if(prev.substring(0,3).equalsIgnoreCase("SIM") && next.substring(0,6).equalsIgnoreCase("ON-OFF")){
+        return 2.0/3;
     }
     return 0;
 //    return factor;
@@ -249,7 +251,7 @@ class Burner{
         void updateFirebaseModesNode(){
             Serial.println("In update firebase modes");
             // create JSON object and push to firebase
-            StaticJsonBuffer<200> jsonBuffer;
+            StaticJsonBuffer<400> jsonBuffer;
 
             // create an object
             Serial.println("Updating..");
@@ -270,6 +272,8 @@ class Burner{
                 newModesNode[modesOrder[i]] = modesIntervalsArr[i];
                 Serial.print(modesOrder[i]);
                 Serial.println(modesIntervalsArr[i]);
+                float inter = newModesNode[modesOrder[i]];
+                Serial.println(inter);
                 Serial.println(modesFinishTimes[i]);
             }
 
@@ -420,6 +424,15 @@ void Burner :: continueCooking(){
         // get the time the user wants the food to be cooked more for
         float timeToExtend = Firebase.getFloat(firebase_path + String("extra_time"));
 
+        if(Firebase.failed()){
+            Serial.println("Failed to retrieve extra_time");
+            delay(1000);
+            timeToExtend = Firebase.getFloat(firebase_path + String("extra_time"));
+        }
+
+        Serial.print("Time to extend is: ");
+        Serial.println(timeToExtend);
+
         // add this duration to the last mode in the modes order
         modesIntervalsArr[num_modes - 1] += timeToExtend;
         modesFinishTimes[num_modes - 1] += timeToExtend;
@@ -430,7 +443,10 @@ void Burner :: continueCooking(){
         Serial.print("flame detect path is");
         Serial.println(firebase_path + String("flame_detect"));
         Firebase.setBool(firebase_path + String("flame_detect"), true);
-        ignited = true;   
+        ignited = true; 
+
+        // the last mode was marked as seen, so unmark it as the user is continuing cooking from this step.
+        modesFinished[num_modes - 1] = false;
     }
     
     
@@ -438,8 +454,11 @@ void Burner :: continueCooking(){
 }
 void Burner :: autoKnobControl(){
 
-//    Serial.println("autoKnobControl called!");
+    Serial.println("autoKnobControl called!");
     unsigned long diff = millis() - startMillis;
+    Serial.print("diff is: ");
+    Serial.println(diff);
+    Serial.println(num_modes);
     String trimNext;
     for(int i = num_modes - 1; i >= 0; i--){
 //        Serial.println(modesOrder[i]);
@@ -459,9 +478,11 @@ void Burner :: autoKnobControl(){
             motor.setDirAndRotate(prev, trimNext);
             setKnobStatus(trimNext);
             if(next.equalsIgnoreCase("OFF")){
+                endMillis = millis();
                 ignited = false;
                 setFlameStatus(false);
                 Firebase.setInt(firebase_path + String("req_to_start_stop"), 0);
+                Firebase.setInt(firebase_path + String("continue"), 0);
             }
             prev = next;
             modesFinished[i] = true;
@@ -548,6 +569,17 @@ void Burner :: monitorManualKnob(){
 //                    modesIntervalsArr[i+1] = durReduced * getFlameFactor(prev, next);
 //                    updateFirebaseModesNode();
 //                }
+                // if OFF is chosen as the next mode by the user
+                // then delete all other subsequent steps from the modes list
+                else if(next.equalsIgnoreCase("OFF")){
+                    int gap = num_modes - (i+1);
+                    Serial.print("No. of deleted modes: ");
+                    Serial.println(gap);
+                    num_modes -= gap;
+
+                    // this is called so that the dur reduced in the current step is reflected in the db
+                    updateFirebaseModesNode();
+                }
                 // if the the user abrupts a step in between(either in between or in the last) and manually goes to a new step(which is not OFF)
                 // then the new step and its finish time should be added to the arrays
                 else if( (i < num_modes - 1 && !next.equalsIgnoreCase(modesOrder[i+1])) || (i == num_modes -1 && !next.equalsIgnoreCase("OFF")) ){
@@ -620,14 +652,6 @@ void Burner :: monitorManualKnob(){
                         updateFirebaseModesNode();
                     }
                     
-                }
-                // if OFF is chosen as the next mode by the user
-                // then delete all other subsequent steps from the modes list
-                else if(next.equalsIgnoreCase("OFF")){
-                    int gap = num_modes - (i+1);
-                    Serial.print("No. of deleted modes: ");
-                    Serial.println(gap);
-                    num_modes -= gap;
                 }
                 break;
             }
