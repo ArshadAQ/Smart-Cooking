@@ -1,6 +1,34 @@
 Food_item,Mass,Burner_size,order3
-Tea,600,medium,-1
+Boiled egg,200,medium,1
+Chicken soup,100,medium,2
+Maggie,200,medium,0
+Water,1000,medium,-1
+Mutton masala,400,medium,0
+Tea,600,medium,3
 Milk,1000,medium,1
 Idli,500,medium,-1
 Water,200,medium,3
 Chicken soup,500,medium,-1
+Idli,700,medium,-1
+Boiled egg,200,small,1
+Chicken soup,100,small,2
+Maggie,200,small,0
+Water,1000,small,-1
+Mutton masala,400,small,0
+Tea,600,small,3
+Milk,1000,small,1
+Idli,500,small,-1
+Water,200,small,3
+Chicken soup,500,small,-1
+Idli,700,small,-1
+Boiled egg,200,large,1
+Chicken soup,100,large,2
+Maggie,200,large,0
+Water,1000,large,-1
+Mutton masala,400,large,0
+Tea,600,large,3
+Milk,1000,large,1
+Idli,500,large,-1
+Water,200,large,3
+Chicken soup,500,large,-1
+Idli,700,large,-1

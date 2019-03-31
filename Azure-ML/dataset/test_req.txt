@@ -1,0 +1,43 @@
+PUT /smartcookingtraining/train_sim2.csv?comp=appendblock HTTP/1.1
+Host: smartcookingtarpstorage.blob.core.windows.net
+Authorization: 
+x-ms-version: 2018-03-28
+x-ms-date: 
+Content-Type: application/xml
+cache-control: no-cache
+Postman-Token: caade0aa-36ae-4a55-9a36-efd352dd379a
+Maggi,500,medium,4
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+Host: smartcookingtarpstorage.blob.core.windows.net
+Authorization: SharedKey smartcookingtarpstorage:qLyb2MJsnduKRcLoaKN25QBBQjq/j6yU3V1MMWnLJ+DbroIv4evQRd/H05eRRi+YVW6XegyF1VcDZkWcQl1rng==
+x-ms-version: 2018-03-28
+x-ms-date: 
+Content-Type: application/xml
+cache-control: no-cache
+afaf,200,aa,6
+
+Authorization:"SharedKey smartcookingtarpstorage:UnC+YM7RZMVDPiCRrjr3L4d5RrRSa/jq8CPpyyuCPj8="
+x-ms-version:"2018-03-28"
+x-ms-date:"Thu, 28 Mar 2019 20:39:36 GMT"
+Content-Type:"application/xml"
+cache-control:"no-cache"
+Postman-Token:"31f3f782-baaf-491e-aa44-b689d7604d38"
+User-Agent:"PostmanRuntime/7.4.0"
+Accept:"*/*"
+Host:"smartcookingtarpstorage.blob.core.windows.net"
+accept-encoding:"gzip, deflate"
+content-length:20
+
+Authorization:"SharedKey smartcookingtarpstorage:v0MhehqCpD9aHSFNvj6aSELiNriRMZBsHb4/UGHmpWQ="
+x-ms-version:"2018-03-28"
+Content-Type:"application/xml"
+Content-Length:"20"
+x-ms-date:"Thu, 28 Mar 2019 20:22:36 GMT"
+cache-control:"no-cache"
+Postman-Token:"ef1a6694-713f-4579-b54c-0e866b7b89b3"
+User-Agent:"PostmanRuntime/7.4.0"
+Accept:"*/*"
+Host:"smartcookingtarpstorage.blob.core.windows.net"
+accept-encoding:"gzip, deflate"
