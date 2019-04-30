@@ -10,3 +10,9 @@ An IOT device designed to solve the problem of overcooking by automating the gas
 ## Prototype
 <img src = "https://github.com/ArshadAQ/Smart-Cooking/blob/master/images/prototype.jpg" width = 600> 
 <img src = "https://github.com/ArshadAQ/Smart-Cooking/blob/master/images/home.png" height = 400 align = "left"><img src = "https://github.com/ArshadAQ/Smart-Cooking/blob/master/images/cook.png" height = 400>
+
+## Collaboration
+
+[Aravintharam](https://github.com/Aravintharam) - Android Application
+
+[Arshad](https://github.com/ArshadAQ) - IOT, ML, Microcontroller coding
