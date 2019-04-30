@@ -4,7 +4,7 @@ An IOT device designed to solve the problem of overcooking by automating the gas
 ## Flowchart
 ![flowchart](https://github.com/ArshadAQ/Smart-Cooking/blob/master/images/Copy-of-tarp.svg)
 
-## IBM Watson Machine Learning
+## IBM Watson Machine Learning (Deployed model)
 <img alt = "Deployed ML Model screenshot" src = "https://github.com/ArshadAQ/Smart-Cooking/blob/master/images/deployed-ML-Model.png" width = 800> 
 
 ## Prototype
