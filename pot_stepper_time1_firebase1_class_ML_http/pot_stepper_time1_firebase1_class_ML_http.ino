@@ -1,6 +1,7 @@
 #include <ESP8266HTTPClient.h>
 #include <FirebaseArduino.h>
 #include <ESP8266WiFi.h>
+#include <WiFiClientSecureBearSSL.h>
 
 // Set these to run example.
 #define FIREBASE_HOST "nodemcutest-641e9.firebaseio.com"
@@ -17,7 +18,6 @@
 //StaticJsonBuffer<400> jsonBuffer_arr;
 char JSONmessageBuffer[1024];
 const uint8_t fingerprint[20] = {0xE4, 0xE8, 0x1D, 0xD2, 0x66, 0x6D, 0x90, 0x71, 0x25, 0xC0, 0xDA, 0x53, 0x0B, 0x6F, 0x5B, 0xDF, 0x8C, 0xEC, 0x8B, 0x9E};
-
 
 int potPin = A0;    // select the input pin for the potentiometer
 
@@ -772,7 +772,7 @@ class ML_model{
 
         Serial.println(String("In post feedback data ") + option);
 
-        StaticJsonBuffer<256> jsonBuffer;
+        StaticJsonBuffer<200> jsonBuffer;
         JsonObject& root = jsonBuffer.createObject();
         
         JsonArray& fields = root.createNestedArray("fields");
@@ -782,7 +782,7 @@ class ML_model{
 
         JsonArray& values = root.createNestedArray("values");
 
-        StaticJsonBuffer<200> jsonBuffer_arr;
+        StaticJsonBuffer<500> jsonBuffer_arr;
 
         // create an empty array
         JsonArray& value = jsonBuffer_arr.createArray();
@@ -829,36 +829,30 @@ class ML_model{
         client->setFingerprint(fingerprint);
 
         HTTPClient http;
-//
-//
+
+
         Serial.println(url);
         
         http.begin(*client, url);
-//        
-
         
-
-//        HTTPClient http;
-//        
-//        http.begin(url);
         
         http.addHeader("Content-Type", "application/json");            
         http.addHeader("Authorization", String("Bearer ") + access_token);
+        
+        
+        int httpResponseCode = http.POST(JSONmessageBuffer);
+        Serial.println(httpResponseCode);
 
-//        jsonBuffer.clear();
-//        jsonBuffer_arr.clear();
+        
 
         DynamicJsonBuffer jsonBuffer1;
 
         String payload = http.getString();  //Get the response payload
  
-        Serial.println(payload);    //Print request response payload
+//        Serial.println(payload);    //Print request response payload
 
         JsonObject& root1 = jsonBuffer1.parseObject(payload);
         
-        
-        int httpResponseCode = http.POST(JSONmessageBuffer);
-        Serial.println(httpResponseCode);
         if(httpResponseCode != 200){
             Serial.println("error sending http request..");
             if(httpResponseCode == 401){
@@ -872,6 +866,7 @@ class ML_model{
             }
             delay(10000);
         }
+        
 //        jsonBuffer1.clear();
         http.end();  //Close connections
 
@@ -885,8 +880,9 @@ class ML_model{
 
         String url = base_url + instance_id + String("/published_models/") + published_model_id + String("/deployments/") + deployment_id + String("/online");
 
+        StaticJsonBuffer<200> jsonBuffer;
+
         // creating object to send a request
-        StaticJsonBuffer<256> jsonBuffer;
         JsonObject& root = jsonBuffer.createObject();
         
         JsonArray& fields = root.createNestedArray("fields");
@@ -896,7 +892,8 @@ class ML_model{
 
         JsonArray& values = root.createNestedArray("values");
 
-        StaticJsonBuffer<200> jsonBuffer_arr;
+        StaticJsonBuffer<400> jsonBuffer_arr;
+
 
         // create an empty array
         JsonArray& value = jsonBuffer_arr.createArray();
@@ -907,14 +904,8 @@ class ML_model{
 
         values.add(value);
 
-//        char JSONmessageBuffer[1000];
         root.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
         Serial.println(JSONmessageBuffer);
-
-//        HTTPClient http;
-//        
-//        http.begin(url);
-//        Serial.println(url);
 
         std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
@@ -927,7 +918,6 @@ class ML_model{
         
         http.begin(*client, url);
         
-
         
         http.addHeader("Content-Type", "application/json");            
         http.addHeader("Authorization", "Bearer " + access_token);
@@ -965,27 +955,37 @@ class ML_model{
 
         if(option.equalsIgnoreCase("onoffTime")){
 
-            onoffTime = root1["values"][0][0][4];
+            root1["values"].printTo(Serial);
+            root1["values"][0].printTo(Serial);
+            root1["values"][0][0].printTo(Serial);
+
+            float onoffTime = root1["values"][0][4];
             Serial.println(onoffTime);
             
         } else if(option.equalsIgnoreCase("order0")){
 
-            orders[0]= root1["values"][0][0][7];
+            root1["values"].printTo(Serial);
+
+            orders[0]= root1["values"][0][7];
             Serial.println(orders[0]);
             
         } else if(option.equalsIgnoreCase("order1")){
-            orders[1]= root1["values"][0][0][7];
+
+            root1["values"].printTo(Serial);
+            orders[1]= root1["values"][0][7];
             Serial.println(orders[1]);
             
         } else if(option.equalsIgnoreCase("order2")){
-            orders[2]= root1["values"][0][0][7];
+            root1["values"].printTo(Serial);
+            orders[2]= root1["values"][0][7];
             Serial.println(orders[2]);
             
         } else if(option.equalsIgnoreCase("order3")){
-            orders[3]= root1["values"][0][0][7];
+            orders[3]= root1["values"][0][7];
             Serial.println(orders[3]);
             
         }
+
 
 //        jsonBuffer1.clear();
 
@@ -999,6 +999,7 @@ class ML_model{
     }
 
     static void pushPredictedToFirebase(String food_name){
+
         StaticJsonBuffer<400> jsonBuffer;
 
         // create an object
@@ -1039,19 +1040,16 @@ class ML_model{
         // old token in request body as json
         // new token in response body
 
-        StaticJsonBuffer<256> jsonBuffer;
+        StaticJsonBuffer<850> jsonBuffer;
+
         JsonObject& root = jsonBuffer.createObject();
 
         root["token"] = access_token;
 
-//        char JSONmessageBuffer[1000];
         root.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
         Serial.println(JSONmessageBuffer);
 
-//        HTTPClient http;
-//        
-//        http.begin(url);
-std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+        std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
         client->setFingerprint(fingerprint);
 
@@ -1061,7 +1059,6 @@ std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
         Serial.println(url);
         
         http.begin(*client, url);
-        
         
         http.addHeader("Content-Type", "application/json");            
         http.addHeader("Authorization", "Bearer " + access_token);
@@ -1076,10 +1073,6 @@ std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
             refreshToken();
         }
         
-
-//        jsonBuffer.clear();
-//        jsonBuffer_arr.clear();
-
 
 
 
@@ -1104,7 +1097,8 @@ std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 String ML_model::instance_id = "c5962ef1-01be-4bb5-a395-9916e3ee2b68";
 String ML_model::base_url = "https://ibm-watson-ml.mybluemix.net/v3/wml_instances/";
 //String ML_model::access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDA0MDExNiwiZXhwIjoxNTU0MDY4OTE2LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.U2fU4L5x7_loCSRLh0lh8b6ufMLPLbj-1CN5s5cTRtNnhX8H_tn85oj-OTYbjDTX_4YckrU15kaAVWcY0U5GP0Z5s6VVBiLUOnjpfp23ofC8UJlouQvj7bBGHTzKVWNnF0WaX8ZvQb6OBwX0maOMJPGpzldpmM54dYjHlhn4S1lPjIhOVd7NAjHW-LR3u0x8XuxAbXdrCYk-bCwnXnQ4_lqgyb4qVfqcRunZk5KWyE9OEr5D-0yBBjjyhd3WA0td5z18yMiBJNkGjjzXKPLBASWXCnsKNswn_Uuk-tOxI90FDFW2WRbVtvu5dNM8FL2psU003zCf8fz-645Vkmpyxw";
-String ML_model :: access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDE0ODM2NCwiZXhwIjoxNTU0MTc3MTY0LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.AIbBPqQ8RLXMCLAHDxzFCfuQXesdKlaadOCUmj8rcOKPDEAREHSM3hZ-0nc6d-uAmrra7YTaX4EcxUIwJdKZzotDibe1nBB9QFBM7lm9-DD4I7U4elwJhBKpCPh2zRooKjGdyO1plK6CHFJ6huoNP8vF6Dr__u7YFcswa9hRyY-upsR5BVXNzn44SDHYLoqjH3fLD5aJNoRt8yVjLuSGaSEx8JspuXt0Sxrxk-43Z-1Z2FTEiYIj-MhRYS_SobrAIFF2-vlaoiBKKq8jXmh8UDw_IIr1rShOQPXEjK6ge-T3BECieP4OjDYYwvJO_BgvEByeRt-Su6N5bJg3ODrKYg";
+//String ML_model :: access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDE0ODM2NCwiZXhwIjoxNTU0MTc3MTY0LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.AIbBPqQ8RLXMCLAHDxzFCfuQXesdKlaadOCUmj8rcOKPDEAREHSM3hZ-0nc6d-uAmrra7YTaX4EcxUIwJdKZzotDibe1nBB9QFBM7lm9-DD4I7U4elwJhBKpCPh2zRooKjGdyO1plK6CHFJ6huoNP8vF6Dr__u7YFcswa9hRyY-upsR5BVXNzn44SDHYLoqjH3fLD5aJNoRt8yVjLuSGaSEx8JspuXt0Sxrxk-43Z-1Z2FTEiYIj-MhRYS_SobrAIFF2-vlaoiBKKq8jXmh8UDw_IIr1rShOQPXEjK6ge-T3BECieP4OjDYYwvJO_BgvEByeRt-Su6N5bJg3ODrKYg";
+String ML_model :: access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDIxNzgzNCwiZXhwIjoxNTU0MjQ2NjM0LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.FdM-vqICelBQzO6Z9TtlZh12dg5g8HWw-Dk_ofKPrrtWopS1oGeTtsOmj4hteQN0pRlU9EUG7bjXwdlFP7z2IbQgPZLGwbqFDnWHom0238HqY7_DxXb7akLNt8JsX6VeSMFw943uyVCFbuGSD7Zlh_CdvqfwWedJblHKjc8JNmc10pDzm0GX71Gm2nJcIhhanRyYiI0U6lQIBIUjczX1QCBnWjp-9JsmpBnII4X2ALc9IkZm8V8qJ5cyhSoSE2ZdnZT5GtTzwOFzME4mV9SItNiS7SsZf-DhxicDA6SWSu54msChfdFDm84UGDx_X4OIZai3KrrcKxl4NISNBtlREQ";
 
 int ML_model :: orders[4];
 bool ML_model::onoffFound = false;
@@ -1165,17 +1159,24 @@ void setup() {
         check = Firebase.getString("/aaa/model");
     } while(Firebase.failed() || check.equalsIgnoreCase(""));
 
+    Serial.println("hi");
+
     
     num_burners = Firebase.getInt("/aaa/config/num_burners");
+
+    Serial.println("hi1");
     
     for(int i = 0; i < num_burners; i++){
 //        burners[i].ignited = false;
 //        burners[i].setModesIntervalsNode(NULL);
         burners[i].motor.initPins(D8, D7);
         burners[i].pot.initPin(A0);
-        burners[i].weight.initPins(D2, D3);
+//        burners[i].weight.initPins(D2, D3);
         burners[i].burnerNumber = i+1;
     }
+
+    Serial.println("hi2");
+    Serial.println(num_burners);
 
 //    ml[0].init("e9aeec1b-9fff-4338-a7f1-a9ad2493a915", "e39b9323-d068-478f-a447-3aca2b282d8a");
 //ml[1].init("6469af67-2a25-48c8-8172-c936707996d7", "4f209f47-ce78-4939-9820-6d2c381cebe3");
@@ -1185,11 +1186,13 @@ void setup() {
 
     
     Firebase.stream("/aaa");
+    Serial.println("hi3");
     if(Firebase.success()){
         Serial.println("streaming success"); 
     } else {
         Serial.println(Firebase.error());
     }
+    Serial.println("hi4");
 
 }
 

@@ -15,7 +15,7 @@
 
 //StaticJsonBuffer<1000> jsonBuffer;
 //StaticJsonBuffer<400> jsonBuffer_arr;
-char JSONmessageBuffer[1024];
+char JSONmessageBuffer[512];
 const uint8_t fingerprint[20] = {0xE4, 0xE8, 0x1D, 0xD2, 0x66, 0x6D, 0x90, 0x71, 0x25, 0xC0, 0xDA, 0x53, 0x0B, 0x6F, 0x5B, 0xDF, 0x8C, 0xEC, 0x8B, 0x9E};
 
 
@@ -877,13 +877,7 @@ class ML_model{
 
     }
 
-    // possiblity to refactor here. The jsonobject gets created and destroyed for every call of this function. This could instead be kept in memory.
-    void predict(String food_name, float mass, String burner_size, String option){
-
-        Serial.println("In predict..");
-        
-
-        String url = base_url + instance_id + String("/published_models/") + published_model_id + String("/deployments/") + deployment_id + String("/online");
+    void getDatatoPredict(String food_name, float mass, String burner_size, String option){
 
         // creating object to send a request
         StaticJsonBuffer<256> jsonBuffer;
@@ -911,6 +905,17 @@ class ML_model{
         root.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
         Serial.println(JSONmessageBuffer);
 
+    }
+
+    // possiblity to refactor here. The jsonobject gets created and destroyed for every call of this function. This could instead be kept in memory.
+    void predict(String food_name, float mass, String burner_size, String option){
+
+        Serial.println("In predict..");
+
+        String url = base_url + instance_id + String("/published_models/") + published_model_id + String("/deployments/") + deployment_id + String("/online");
+        
+        getDatatoPredict(food_name, mass, burner_size, option);
+        
 //        HTTPClient http;
 //        
 //        http.begin(url);

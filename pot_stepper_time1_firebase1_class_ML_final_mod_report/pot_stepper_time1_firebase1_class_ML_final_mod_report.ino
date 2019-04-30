@@ -3,28 +3,18 @@
 #include <ESP8266WiFi.h>
 
 // Set these to run example.
-#define FIREBASE_HOST "nodemcutest-641e9.firebaseio.com"
-#define FIREBASE_AUTH "981Hw0F0SbDQnf3nr4AZnyzKPgYUeEjEiRTQk6cC"
-#define WIFI_SSID "TP-Link_D322"
-#define WIFI_PASSWORD "aqaiyoom123"
-//#define WIFI_SSID "Moto G (5S) Plus 6296"
-//#define WIFI_PASSWORD "ars123had"
+#define FIREBASE_HOST "stoveapp-8cd69.firebaseio.com"
+#define FIREBASE_AUTH "1i6onmEYLJeKvwPeSsRUwU6cwm9QCb4fqunRpNE2"
+
+#define WIFI_SSID "Moto G (5S) Plus 6296"
+#define WIFI_PASSWORD "ars123had"
 
 #define MAX_MODES 6
 #define MAX_BURNERS 6
 
-//StaticJsonBuffer<1000> jsonBuffer;
-//StaticJsonBuffer<400> jsonBuffer_arr;
-char JSONmessageBuffer[1024];
-const uint8_t fingerprint[20] = {0xE4, 0xE8, 0x1D, 0xD2, 0x66, 0x6D, 0x90, 0x71, 0x25, 0xC0, 0xDA, 0x53, 0x0B, 0x6F, 0x5B, 0xDF, 0x8C, 0xEC, 0x8B, 0x9E};
-
 
 int potPin = A0;    // select the input pin for the potentiometer
 
-//int val = 0;       // variable to store the value coming from the sensor
-//
-//int deg = 0;       // variable to store the value coming from the sensor
-//int prevDeg = 0;
 
 int pos = 0;
 
@@ -32,14 +22,12 @@ int pos = 0;
 const int stepPin = D8;
 const int dirPin = D7;
 
-//String prev = "OFF";
-//String next;
 
 int positions[] = {0, 45, 90, 135, 180};
 String modes[] = {"OFF", "ON-OFF", "ON", "ON-SIM", "SIM"};
 
 float getFlameFactor(String prev, String next){
-//    float factor;
+
     Serial.println("getting factor..");
     if(prev.substring(0,2).equalsIgnoreCase("ON") && next.substring(0,6).equalsIgnoreCase("ON-OFF")){
         return 1.5;
@@ -55,7 +43,7 @@ float getFlameFactor(String prev, String next){
         return 2.0/3;
     }
     return 0;
-//    return factor;
+
 }
 
 
@@ -87,7 +75,6 @@ void StepperMotor :: compareAndRotate(int prevIndex, String next) {
     int dir;
     for (int i = 0; i < 5; i++) {
         if (modes[i].equalsIgnoreCase(next)) {
-            //  dir = i > prevIndex? 1 : -1;
             dir = i > prevIndex ? -1 : 1;
             rotate(abs(i - prevIndex) * 45, dir);
             break;
@@ -131,7 +118,6 @@ void StepperMotor :: rotate(int deg, int dir) {
     }
 
 }
-//boolean cooking = false;
 
 class Potentiometer{
     
@@ -153,7 +139,6 @@ int Potentiometer :: getDegree() {
     
     int val = analogRead(potPin);    // read the value from the sensor
 
-    // deg = map(val, 150, 820, 180, 0);
     int deg = map(val, 136, 840, 180, 0);
     
     if (deg < 0) {
@@ -203,11 +188,9 @@ class Burner{
 
     boolean flame_detect = false;
 
-    // knob mode
-    // prev mode and the mode to switch to next
-    String prev, next;
-
     public:
+
+        String prev, next;
 
         int burnerNumber;
 
@@ -319,14 +302,9 @@ class Burner{
                     float val = kvp.value;
                     Serial.println(key);
                     Serial.println(val);
-                    // if a mode duration is < 12 secs, then discard that step
-    //                if(val < 0.2){
-    //                    newModesNode.remove(kvp.key);
-    //                } 
                 }
             }
             Serial.println(String("/aaa/Food_profile/") + food_name + String("/steps"));
-//            modesIntervalsNode = (FirebaseObject&)newModesNode;
             Firebase.set(String("/aaa/Food_profile/") + food_name + String("/steps"), newModesNodes);
             if(Firebase.failed()){
                 Serial.println("Failed to update modes");
@@ -356,6 +334,8 @@ boolean Burner :: turnONandWaitForIgnition(String frstMode){
     
     prev = "OFF";
     next = frstMode;
+
+    Serial.println("Next step is :" + prev + next);
     
     motor.setDirAndRotate(prev, next);
     setKnobStatus(next);
@@ -410,34 +390,19 @@ void Burner :: initCooking(){
             sum += val;
             modesIntervalsArr[i] = val;
             modesFinishTimes[i++] = sum;
-    //        Serial.println(key);
-    //        Serial.println(val);
-    //        Serial.println(sum);
             Serial.println(modesOrder[i-1]);
             Serial.println(modesFinishTimes[i-1]);
             Serial.println(modesIntervalsArr[i-1]);
         }
     }
-    
-//    for(JsonPair& kvp : modesIntervals) {
-//        // But the key is actually stored in RAM (in the JsonBuffer)
-//        String key = kvp.key;
-//        modesOrder[i] = key;
-//        val = kvp.value;
-//        sum += val;
-//        modesIntervalsArr[i] = val;
-//        modesFinishTimes[i++] = sum;
-////        Serial.println(key);
-////        Serial.println(val);
-////        Serial.println(sum);
-//        Serial.println(modesOrder[i-1]);
-//        Serial.println(modesFinishTimes[i-1]);
-//        Serial.println(modesIntervalsArr[i-1]);
-//    }
-    
-    
-}
 
+    // if cooking starts again, then none of the modes is finished
+    for(int i = 0; i < num_modes; i++){
+        modesFinished[i] = false;
+    }
+
+}
+    
 void Burner :: continueCooking(){
 
     Serial.println("continue cooking");
@@ -452,13 +417,17 @@ void Burner :: continueCooking(){
         // move forward the start time by the amount delayed
         startMillis += delayed;
 
-        // get the time the user wants the food to be cooked more for
-        float timeToExtend = Firebase.getFloat(firebase_path + String("extra_time"));
+        float timeToExtend = 0;
 
-        if(Firebase.failed()){
+        timeToExtend = Firebase.getFloat(firebase_path + String("extra_time"));
+        if(timeToExtend == 0){
+            delay(2000);
             Serial.println("Failed to retrieve extra_time");
-            delay(1000);
-            timeToExtend = Firebase.getFloat(firebase_path + String("extra_time"));
+            Serial.println("mm1");
+            Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+            if(Firebase.success()){
+                Serial.println("connection made"); 
+            }
         }
 
         Serial.print("Time to extend is: ");
@@ -492,16 +461,13 @@ void Burner :: autoKnobControl(){
     Serial.println(num_modes);
     String trimNext;
     for(int i = num_modes - 1; i >= 0; i--){
-//        Serial.println(modesOrder[i]);
-//        Serial.println(modesFinishTimes[i]);
-//        Serial.print(modesFinished[i]);
-//        Serial.println(i);
+
         if((diff >= modesFinishTimes[i]*60000) && (modesFinished[i] == false)){
             Serial.print(prev);
             Serial.println("is over");
             Serial.println(modesFinishTimes[i]);
             next = (i == num_modes - 1 ? "OFF": modesOrder[i+1]);
-//            String orgNext = next;
+
             // to remove any trailing digits
             trimNext = next.substring(0, next.length());
             Serial.print("Next mode is: ");
@@ -555,13 +521,11 @@ void Burner :: monitorManualKnob(){
         Serial.println(deg);
         
         next = modes[index];
-//        burners[burnerNumber].motor.setDirAndRotate(prev, next);
         if(prev.equalsIgnoreCase(next)){
             return;
         }
         motor.setDirAndRotate(prev, next);
         
-//        unsigned long diff1 = millis() - burners[burnerNumber].startMillis;
         unsigned long diff1 = millis() - startMillis;
 
         for(int i = 0; i < num_modes; i++){
@@ -590,16 +554,6 @@ void Burner :: monitorManualKnob(){
                     }
                     updateFirebaseModesNode();
                 }
-                // if the system is in its last step, and the user abrupts this last step and goes on to a new step
-//                else if(i == num_modes -1 && !next.equalsIgnoreCase("OFF")){
-//                    Serial.println("NEW step in the last..");
-//                    float k;
-//                    num_modes++;
-//                    modesOrder[i+1] = next;
-//                    modesFinishTimes[i+1] = modesFinishTimes[i] + durReduced * getFlameFactor(prev, next);
-//                    modesIntervalsArr[i+1] = durReduced * getFlameFactor(prev, next);
-//                    updateFirebaseModesNode();
-//                }
                 // if OFF is chosen as the next mode by the user
                 // then delete all other subsequent steps from the modes list
                 else if(next.equalsIgnoreCase("OFF")){
@@ -696,9 +650,6 @@ void Burner :: monitorManualKnob(){
 Burner burners[MAX_BURNERS];
 
 class ML_model{
-//    static String instance_id = "c5962ef1-01be-4bb5-a395-9916e3ee2b68";
-//    static String base_url = "https://ibm-watson-ml.mybluemix.net/v3/wml_instances/";
-//    static String access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDA0MDExNiwiZXhwIjoxNTU0MDY4OTE2LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.U2fU4L5x7_loCSRLh0lh8b6ufMLPLbj-1CN5s5cTRtNnhX8H_tn85oj-OTYbjDTX_4YckrU15kaAVWcY0U5GP0Z5s6VVBiLUOnjpfp23ofC8UJlouQvj7bBGHTzKVWNnF0WaX8ZvQb6OBwX0maOMJPGpzldpmM54dYjHlhn4S1lPjIhOVd7NAjHW-LR3u0x8XuxAbXdrCYk-bCwnXnQ4_lqgyb4qVfqcRunZk5KWyE9OEr5D-0yBBjjyhd3WA0td5z18yMiBJNkGjjzXKPLBASWXCnsKNswn_Uuk-tOxI90FDFW2WRbVtvu5dNM8FL2psU003zCf8fz-645Vkmpyxw";
 
     public:
 
@@ -713,12 +664,12 @@ class ML_model{
     
     String published_model_id;
     String deployment_id;
-//    String url;
 
-//    ML_model(const char* published_model_id, const char* deployment_id){
-//        this -> published_model_id = (String)published_model_id;
-//        this -> deployment_id = (String)deployment_id;
-//    }
+    ML_model(String published_model_id, String deployment_id){
+        this -> published_model_id = published_model_id;
+        this -> deployment_id = deployment_id;
+    }
+
 
     void init(String published_model_id, String deployment_id){
         this -> published_model_id = published_model_id;
@@ -732,7 +683,6 @@ class ML_model{
 
         bool onoffFound = false;
 
-//        int orders[4];
 
 
         // fill the order and also on-off value if present
@@ -741,10 +691,8 @@ class ML_model{
             JsonObject& interval = modes1.value;
             for(JsonPair& kvp : interval){
                 String key = kvp.key;
-//                orders[modes[(modes1.key).substr()]
                 if(key.equalsIgnoreCase("ON-OFF")){
                     float val = kvp.value;
-//                    value.add(val);
                     onoffTime = val;
                     onoffFound = true;
 
@@ -760,7 +708,6 @@ class ML_model{
                     orders[3] = (String(modes1.key).substring(4)).toInt();
                     Serial.println(orders[3]);
                 }
-//                if(found) break;
             }
         }
 
@@ -818,7 +765,7 @@ class ML_model{
 
         values.add(value);
 
-//        char JSONmessageBuffer[1000];
+        char JSONmessageBuffer[1000];
         root.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
         Serial.println(JSONmessageBuffer);
 
@@ -826,21 +773,14 @@ class ML_model{
 
         std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
-        client->setFingerprint(fingerprint);
+//        client->setFingerprint(fingerprint);
 
         HTTPClient http;
-//
-//
+
         Serial.println(url);
         
         http.begin(*client, url);
-//        
 
-        
-
-//        HTTPClient http;
-//        
-//        http.begin(url);
         
         http.addHeader("Content-Type", "application/json");            
         http.addHeader("Authorization", String("Bearer ") + access_token);
@@ -872,7 +812,7 @@ class ML_model{
             }
             delay(10000);
         }
-//        jsonBuffer1.clear();
+
         http.end();  //Close connections
 
     }
@@ -907,18 +847,14 @@ class ML_model{
 
         values.add(value);
 
-//        char JSONmessageBuffer[1000];
+        char JSONmessageBuffer[1000];
         root.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
         Serial.println(JSONmessageBuffer);
 
-//        HTTPClient http;
-//        
-//        http.begin(url);
-//        Serial.println(url);
 
         std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
-        client->setFingerprint(fingerprint);
+//        client->setFingerprint(fingerprint);
 
         HTTPClient http;
 
@@ -935,8 +871,6 @@ class ML_model{
         int httpResponseCode = http.POST(JSONmessageBuffer);
         Serial.println(httpResponseCode);
         
-//        jsonBuffer.clear();
-//        jsonBuffer_arr.clear();
 
         DynamicJsonBuffer jsonBuffer1;
 
@@ -1044,16 +978,14 @@ class ML_model{
 
         root["token"] = access_token;
 
-//        char JSONmessageBuffer[1000];
+        char JSONmessageBuffer[1000];
         root.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
         Serial.println(JSONmessageBuffer);
 
-//        HTTPClient http;
-//        
-//        http.begin(url);
-std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
-        client->setFingerprint(fingerprint);
+        std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+
+//        client->setFingerprint(fingerprint);
 
         HTTPClient http;
 
@@ -1066,7 +998,6 @@ std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
         http.addHeader("Content-Type", "application/json");            
         http.addHeader("Authorization", "Bearer " + access_token);
 
-//        http.getHeader();
         
         int httpResponseCode = http.PUT(JSONmessageBuffer);
         Serial.println(httpResponseCode);
@@ -1103,19 +1034,13 @@ std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
 String ML_model::instance_id = "c5962ef1-01be-4bb5-a395-9916e3ee2b68";
 String ML_model::base_url = "https://ibm-watson-ml.mybluemix.net/v3/wml_instances/";
-//String ML_model::access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDA0MDExNiwiZXhwIjoxNTU0MDY4OTE2LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.U2fU4L5x7_loCSRLh0lh8b6ufMLPLbj-1CN5s5cTRtNnhX8H_tn85oj-OTYbjDTX_4YckrU15kaAVWcY0U5GP0Z5s6VVBiLUOnjpfp23ofC8UJlouQvj7bBGHTzKVWNnF0WaX8ZvQb6OBwX0maOMJPGpzldpmM54dYjHlhn4S1lPjIhOVd7NAjHW-LR3u0x8XuxAbXdrCYk-bCwnXnQ4_lqgyb4qVfqcRunZk5KWyE9OEr5D-0yBBjjyhd3WA0td5z18yMiBJNkGjjzXKPLBASWXCnsKNswn_Uuk-tOxI90FDFW2WRbVtvu5dNM8FL2psU003zCf8fz-645Vkmpyxw";
 String ML_model :: access_token = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6ImM1OTYyZWYxLTAxYmUtNGJiNS1hMzk1LTk5MTZlM2VlMmI2OCIsImluc3RhbmNlSWQiOiJjNTk2MmVmMS0wMWJlLTRiYjUtYTM5NS05OTE2ZTNlZTJiNjgiLCJwbGFuSWQiOiIzZjZhY2Y0My1lZGU4LTQxM2EtYWM2OS1mOGFmM2JiMGNiZmUiLCJyZWdpb24iOiJ1cy1zb3V0aCIsInVzZXJJZCI6ImVmYWNkNTM3LTY4ODUtNGE1MC04MTA5LWUxYTUyNzYzM2Q2ZiIsImlzcyI6Imh0dHBzOi8vdXMtc291dGgubWwuY2xvdWQuaWJtLmNvbS92My9pZGVudGl0eSIsImlhdCI6MTU1NDE0ODM2NCwiZXhwIjoxNTU0MTc3MTY0LCJjcmVhdGVkVGltZSI6MTU1Mzg1Mjk4OX0.AIbBPqQ8RLXMCLAHDxzFCfuQXesdKlaadOCUmj8rcOKPDEAREHSM3hZ-0nc6d-uAmrra7YTaX4EcxUIwJdKZzotDibe1nBB9QFBM7lm9-DD4I7U4elwJhBKpCPh2zRooKjGdyO1plK6CHFJ6huoNP8vF6Dr__u7YFcswa9hRyY-upsR5BVXNzn44SDHYLoqjH3fLD5aJNoRt8yVjLuSGaSEx8JspuXt0Sxrxk-43Z-1Z2FTEiYIj-MhRYS_SobrAIFF2-vlaoiBKKq8jXmh8UDw_IIr1rShOQPXEjK6ge-T3BECieP4OjDYYwvJO_BgvEByeRt-Su6N5bJg3ODrKYg";
 
 int ML_model :: orders[4];
 bool ML_model::onoffFound = false;
 
 float ML_model :: onoffTime = 0;
-//static int orders[4];
 
-//Demo obj[2] = { {1,2,3}, {11,12,13}};
-
-
-//ML_model ml[5];
 // model ids and deployment ids of 5 models
 ML_model ml[5] = { {"e9aeec1b-9fff-4338-a7f1-a9ad2493a915", "e39b9323-d068-478f-a447-3aca2b282d8a"},
                    {"6469af67-2a25-48c8-8172-c936707996d7", "4f209f47-ce78-4939-9820-6d2c381cebe3"},
@@ -1124,15 +1049,10 @@ ML_model ml[5] = { {"e9aeec1b-9fff-4338-a7f1-a9ad2493a915", "e39b9323-d068-478f-
                    {"3c96a57b-71d8-4231-8140-1bbff9bd8b1b", "199e91d2-8cf4-464d-a132-f9b8d2fbdac9"}
                 };
 
-//ML_model ml[5] = { ML_model("e9aeec1b-9fff-4338-a7f1-a9ad2493a915", "e39b9323-d068-478f-a447-3aca2b282d8a"),
-//                   ML_model("6469af67-2a25-48c8-8172-c936707996d7", "4f209f47-ce78-4939-9820-6d2c381cebe3"),
-//                   ML_model("a38da041-b45e-455d-b3dc-1e422e2faf37", "f9c27b60-1a5f-45c3-8225-4ecd8d17c392"),
-//                   ML_model("c3f560b5-2112-4455-a440-65307ac93def", "59b70da1-5f57-428b-96eb-e0ef0b1b3232"),
-//                   ML_model("3c96a57b-71d8-4231-8140-1bbff9bd8b1b", "199e91d2-8cf4-464d-a132-f9b8d2fbdac9")
-//                };
-
-
+FirebaseArduino f;
 void setup() {
+
+    f.begin(FIREBASE_HOST, FIREBASE_AUTH);
     
     Serial.begin(9600);
 
@@ -1163,33 +1083,30 @@ void setup() {
     // wait until the app has initialised the user's information
     do {
         check = Firebase.getString("/aaa/model");
+        Serial.println("Hi");
+        Serial.println(check);
     } while(Firebase.failed() || check.equalsIgnoreCase(""));
 
     
     num_burners = Firebase.getInt("/aaa/config/num_burners");
+    Serial.println(num_burners);
     
     for(int i = 0; i < num_burners; i++){
-//        burners[i].ignited = false;
-//        burners[i].setModesIntervalsNode(NULL);
         burners[i].motor.initPins(D8, D7);
         burners[i].pot.initPin(A0);
         burners[i].weight.initPins(D2, D3);
         burners[i].burnerNumber = i+1;
     }
 
-//    ml[0].init("e9aeec1b-9fff-4338-a7f1-a9ad2493a915", "e39b9323-d068-478f-a447-3aca2b282d8a");
-//ml[1].init("6469af67-2a25-48c8-8172-c936707996d7", "4f209f47-ce78-4939-9820-6d2c381cebe3");
-//ml[2].init("a38da041-b45e-455d-b3dc-1e422e2faf37", "f9c27b60-1a5f-45c3-8225-4ecd8d17c392");
-//ml[3].init("c3f560b5-2112-4455-a440-65307ac93def", "59b70da1-5f57-428b-96eb-e0ef0b1b3232");
-//ml[4].init("3c96a57b-71d8-4231-8140-1bbff9bd8b1b", "199e91d2-8cf4-464d-a132-f9b8d2fbdac9");
 
-    
-    Firebase.stream("/aaa");
-    if(Firebase.success()){
+     f.stream("/aaa");
+    if(f.success()){
         Serial.println("streaming success"); 
     } else {
+        Serial.println("asasfassfaf");
         Serial.println(Firebase.error());
     }
+
 
 }
 
@@ -1203,15 +1120,13 @@ void loop() {
         Burner &curr_burner = burners[i];
         if(curr_burner.ignited){
             curr_burner.monitorManualKnob();
-//            Serial.print("calling auto knob control on burner");
-//            Serial.println(i);
             curr_burner.autoKnobControl();
         }
     }
 
 
-    if (Firebase.available()) {
-        FirebaseObject event = Firebase.readEvent();
+    if (f.available()) {
+        FirebaseObject event = f.readEvent();
         String eventType = event.getString("type");
         eventType.toLowerCase();
         
@@ -1229,12 +1144,16 @@ void loop() {
                 String burner = path.substring(1,8);
                 String path = "/aaa/" + burner + "/";
                 int data = event.getInt("data");
-//                String knob_status = Firebase.getString("/aaa/" + burner + "knob_status");
+
                 Serial.println(path);
                 String knob_status = Firebase.getString(path + "/knob_status");
                 if(Firebase.failed()){
                     Serial.println("get knob status failed.. trying again");
                     delay(1000);
+                        Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+                            if(Firebase.success()){
+                                Serial.println("connection made"); 
+                            }
                     knob_status = Firebase.getString(path + "/knob_status");
                 }
                 Serial.println(data);
@@ -1244,7 +1163,7 @@ void loop() {
                     Serial.println("Need to start!");
 
                     // Get the selected food name
-                    String food_name = Firebase.getString(path + "food_name");
+                    String food_name = Firebase.getString(path + "Food_name");
                     Serial.println(food_name);
                     
                     // Get the burner number
@@ -1267,45 +1186,41 @@ void loop() {
 //                    float mass = Firebase.getFloat(path + String("mass"));
                     float mass = 50;
                     
-//                    if(abs(mass - burners[burnerNumber].weight.getMass()) > 50){
-//                        Serial.println();
-//                        ml[0].refreshToken();
-                        ml[0].predict(food_name, mass, burner_size, "onoffTime");
-                        ml[1].predict(food_name, mass, burner_size, "order0");
-                        ml[2].predict(food_name, mass, burner_size, "order1");
-                        ml[3].predict(food_name, mass, burner_size, "order2");
-                        ml[4].predict(food_name, mass, burner_size, "order3");
+//                    ml[0].predict(food_name, mass, burner_size, "onoffTime");
+//                    ml[1].predict(food_name, mass, burner_size, "order0");
+//                    ml[2].predict(food_name, mass, burner_size, "order1");
+//                    ml[3].predict(food_name, mass, burner_size, "order2");
+//                    ml[4].predict(food_name, mass, burner_size, "order3");
 
-                        // after gathering the predictions, push them to firebase
-                        ML_model :: pushPredictedToFirebase(food_name);
-//                    }
+                    // after gathering the predictions, push them to firebase
+//                    ML_model :: pushPredictedToFirebase(food_name);
+
+//                    Serial.println("path is.." + String("/aaa/") + String("Food_profile/") + food_name + String("/steps"));
                     FirebaseObject modesIntervalsNode = Firebase.get(String("/aaa/") + String("Food_profile/") + food_name + String("/steps"));
                     burners[burnerNumber].setModesIntervalsNode(modesIntervalsNode);
                     JsonObject& modesIntervals = (burners[burnerNumber].getModesIntervalsNode()).getJsonVariant();
                     
                     String frstMode;
                     for(JsonPair& nobj : modesIntervals) {
+                        Serial.println("inside");
                         // But the key is actually stored in RAM (in the JsonBuffer)
+                        Serial.println((String)nobj.key);
                         JsonObject& obj = nobj.value;
                         bool found = false;
                         for(JsonPair& kvp : obj){
                             frstMode = kvp.key;
+                            Serial.println("First mode mm is:");
                             Serial.println(frstMode);
                             found = true;
                             break;
-                            
-    //                        int val = kvp.value;
-    //                        Serial.println(key);
-    //                        Serial.println(val);    
+                             
                         }
                         if(found) break;
                     }
+                    Serial.println("First mode is:" + frstMode);
                     boolean ignited = burners[burnerNumber].turnONandWaitForIgnition(frstMode);
                     if(ignited){
                         burners[burnerNumber].initCooking();
-//                        burners[burnerNumber].startMillis[burnerNumber] = millis();
-//                        Firebase.setBool(path + String("flame_detect"), true);
-//                        ignitionStatus[burnerNumber] = true;
                         
                     }
                     
@@ -1313,6 +1228,9 @@ void loop() {
                 } else if(!knob_status.equalsIgnoreCase("OFF") && data == 0){
                     // the request is to switch off the burner
                     Serial.println("Need to stop!");
+
+                    int burnerNumber = (burner.substring(6).toInt()) - 1;
+                    burners[burnerNumber].next  = "OFF";
                     
                 } 
                 Serial.print("data: ");
@@ -1333,13 +1251,13 @@ void loop() {
                     Serial.println("Initiating to retrain..");
                     String burner = path.substring(1,8);
                     int burnerNumber = (burner.substring(6).toInt()) - 1;
-//                    burners[burnerNumber].continueCooking();
-                    ML_model :: getFeedbackData(burners[burnerNumber]);
-                    ml[0].postFeedbackData(burners[burnerNumber], "onoffTime");
-                    ml[1].postFeedbackData(burners[burnerNumber], "order1");
-                    ml[2].postFeedbackData(burners[burnerNumber], "order2");
-                    ml[3].postFeedbackData(burners[burnerNumber], "order3");
-                    ml[4].postFeedbackData(burners[burnerNumber], "order4");
+
+//                    ML_model :: getFeedbackData(burners[burnerNumber]);
+//                    ml[0].postFeedbackData(burners[burnerNumber], "onoffTime");
+//                    ml[1].postFeedbackData(burners[burnerNumber], "order1");
+//                    ml[2].postFeedbackData(burners[burnerNumber], "order2");
+//                    ml[3].postFeedbackData(burners[burnerNumber], "order3");
+//                    ml[4].postFeedbackData(burners[burnerNumber], "order4");
 
                     // after retraining set retrain = false;
                     Firebase.setBool(path, false);

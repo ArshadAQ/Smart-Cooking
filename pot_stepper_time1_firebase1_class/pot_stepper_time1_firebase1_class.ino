@@ -4,10 +4,10 @@
 // Set these to run example.
 #define FIREBASE_HOST "nodemcutest-641e9.firebaseio.com"
 #define FIREBASE_AUTH "981Hw0F0SbDQnf3nr4AZnyzKPgYUeEjEiRTQk6cC"
-#define WIFI_SSID "TP-Link_D322"
-#define WIFI_PASSWORD "aqaiyoom123"
-//#define WIFI_SSID "Moto G (5S) Plus 6296"
-//#define WIFI_PASSWORD "ars123had"
+//#define WIFI_SSID "TP-Link_D322"
+//#define WIFI_PASSWORD "aqaiyoom123"
+#define WIFI_SSID "Moto G (5S) Plus 6296"
+#define WIFI_PASSWORD "ars123had"
 
 #define MAX_MODES 6
 #define MAX_BURNERS 6
